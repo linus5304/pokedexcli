@@ -15,6 +15,21 @@ func (c *Client) ListLocationAreas(pageURL *string) (LocationAreasResp, error) {
 		fullURL = *pageURL
 	}
 
+	// check cache
+	dat, ok := c.cache.Get(fullURL)
+
+	if ok {
+		// cache hit
+		fmt.Println("cache hit!")
+		locationAreasResp := LocationAreasResp{}
+		err := json.Unmarshal(dat, &locationAreasResp)
+		if err != nil {
+			return LocationAreasResp{}, err
+		}
+		return locationAreasResp, nil
+	}
+	fmt.Println("cache miss")
+
 	req, err := http.NewRequest("GET", fullURL, nil)
 	if err != nil {
 		return LocationAreasResp{}, err
@@ -30,7 +45,7 @@ func (c *Client) ListLocationAreas(pageURL *string) (LocationAreasResp, error) {
 		return LocationAreasResp{}, fmt.Errorf("bad status code: %v", res.StatusCode)
 	}
 
-	dat, err := io.ReadAll(res.Body)
+	dat, err = io.ReadAll(res.Body)
 	if err != nil {
 		return LocationAreasResp{}, err
 	}
@@ -41,5 +56,57 @@ func (c *Client) ListLocationAreas(pageURL *string) (LocationAreasResp, error) {
 		return LocationAreasResp{}, err
 	}
 
+	c.cache.Add(fullURL, dat)
+
 	return locationAreasResp, nil
+}
+
+func (c *Client) GetLocationArea(locationAreaName string) (LocationArea, error) {
+	endpoint := "/location-area/" + locationAreaName
+	fullURL := baseURL + endpoint
+
+	// check cache
+	dat, ok := c.cache.Get(fullURL)
+
+	if ok {
+		// cache hit
+		fmt.Println("cache hit!")
+		locationArea := LocationArea{}
+		err := json.Unmarshal(dat, &locationArea)
+		if err != nil {
+			return LocationArea{}, err
+		}
+		return locationArea, nil
+	}
+	fmt.Println("cache miss")
+
+	req, err := http.NewRequest("GET", fullURL, nil)
+	if err != nil {
+		return LocationArea{}, err
+	}
+
+	res, err := c.httpClient.Do(req)
+	if err != nil {
+		return LocationArea{}, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode > 399 {
+		return LocationArea{}, fmt.Errorf("bad status code: %v", res.StatusCode)
+	}
+
+	dat, err = io.ReadAll(res.Body)
+	if err != nil {
+		return LocationArea{}, err
+	}
+
+	locationArea := LocationArea{}
+	err = json.Unmarshal(dat, &locationArea)
+	if err != nil {
+		return LocationArea{}, err
+	}
+
+	c.cache.Add(fullURL, dat)
+
+	return locationArea, nil
 }
